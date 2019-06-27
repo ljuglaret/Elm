@@ -1,0 +1,286 @@
+# Definitions et explications
+
+```elm
+foldRight : (a -> b -> b) -> b -> List a -> b
+foldRight f x l = 
+    case l of 
+        []      -> x 
+        y::s    -> f y (foldRight f x s)
+```
+## deroulement pas a pas 
+
+** fr pour FoldRight
+
+### cas 1
+ [1] ->         f 1 (fr f  x [] )    -> f 1 x 
+
+### cas 2
+ [1,2] -> f 1 (fr f x [2])        
+        ->    (f 2 (fr f x []))    
+
+### cas 3
+ gauche : descente, droite montee
+[1,2,3,4]-> f 1 (fr f x [2,3,4])          -> f 1 (f 2 (f 3 (f 4 x) ))
+        ->      (f 2 (fr f x [3,4]))      -> f 2 (f 3 (f 4 x ))
+        ->           (f 3 (fr x [4]))     -> f 3 (f 4 x)
+                          (f 4 (fr x [])) -> f 4 x
+
+
+
+# Fold Left
+
+```elm
+foldLeft : (a -> b -> b) -> b -> List a -> b
+foldLeft f x l = 
+    case l of 
+        [] -> x 
+        y::s -> foldLeft  f (f y x )  s
+```
+
+
+## deroulement pas a pas 
+
+** fl pour FoldLeft
+
+### cas 1
+
+ [1] -> fl f   (f 1    x        ) [] -> f 1 x
+
+### cas 2
+
+ [1,2] -> fl f (f 1 x) [2] 
+         -> fl f (f 2 (f 1 x)) []
+
+
+### cas 3         
+
+[1,2,3,4]->fl f (f 1 x) [2,3,4]
+         ->fl f (f 2 (f 1 x)) [3,4]
+         ->fl f (f 3 (f 2 (f 1 x))) [4]
+         ->fl f (f 4 (f 3 (f 2 (f 1 x)))) 
+
+# Exemples
+
+## Somme
+
+```elm
+sommeR : List Int -> Int
+sommeR l    =   foldRight (+) 0 l
+
+```
+
+## Map
+
+```elm
+
+mapR : (a ->  b) -> List a -> List b
+mapR f l    =   foldRight (\ x xs -> (f x) :: xs) [] l
+
+```
+
+## Filter
+
+Un filtre est tres similaire a un map a la difference pres que la fonction appliquee est un predicat
+et que l element de la liste est affiche ssi le predicat est vrai
+
+```elm
+filter (a ->  Boolean ) -> List a -> List a
+filterR b l =   foldRight (\ x xs ->
+                            if (b x)
+                            then  x:: xs
+                            else xs) [] l 
+
+```
+## Reverse
+
+```elm
+reverseG l =   foldLeft (::) [] l
+```
+
+## All
+
+All est de type ( a -> Bool ) -> List a -> Bool.
+
+All permet de tester si dans une liste tous les elements verifient le meme predicat.
+Par exemple tous positifs.
+
+```elm
+List.all (\elt -> elt >= 0) [1,2,3,4] -- Vrai
+List.all (\elt -> elt >= 0) [1,-2,3,4]-- Faux
+```
+
+Un fold est de type (a -> b -> b) -> b -> List a -> b
+Le type de a peut changer, mais pas le type de b qui doit toujours etre un booleen.
+
+Le premier argument est une fonction qui prend un element de la liste et un booleen,
+et renvoie un booleen.
+La fonction prise en premier argument est la fonction "ET" puisque c est la seule .....
+
+Le deuxieme argument de la fonction est un accumulateur "acc"de type booleen.
+Il a donc deux valeurs possibles :  Vrai ou Faux.
+
+acc doit verifier pour tout element elt : 
+acc et elt = elt.
+Donc : 
+acc et Vrai = Vrai
+acc et Faux = Faux 
+ 
+Donc acc = Vrai
+
+Le type de Fold et de All semblent differents, mais grace aux lambda fonction......
+De plus Le deuxieme argument est l accumulateur et sa valeur est True (voir plus haut).
+ Fold    : (a -> Bool -> Bool) -> Bool  -> List a -> Bool
+ allFold : (a         -> Bool)          -> List a -> Bool
+
+La fonction donnee en premier argument semble manquer d un argument, on peut lui fournir celui ci
+puisque 
+
+
+```elm
+
+allFold : (a -> Bool) -> List a -> Bool
+allFold b l = foldRight (\ elt bool -> (b elt ) && bool) True l 
+
+```
+## Any 
+
+Any est de type ( a-> Bool) -> List a -> Bool.
+Il se construit sur le meme modele que All mais renvoie vrai si et seulement si
+au moins une valeur verifie le predicat fourni en premier argument.
+
+
+acc doit verifier pour tout element elt : 
+acc ou elt = elt.
+Donc : 
+acc ou Vrai = Vrai
+acc ou Faux = Faux 
+ 
+Donc acc = Faux
+
+
+```elm 
+
+anyFold : (a -> Bool) -> List a -> Bool
+anyFold b l = foldRight (\ elt bool -> (b elt ) || bool) False l 
+
+```
+
+# Passer de l un a l autre
+
+## fold Right avec fold Left
+
+```elm 
+foldR3 f acc l =   (foldLeft (\elt0 acc0  ->  (f elt0 acc0))) (identity l) acc
+```
+
+
+# Unfold
+
+## Implementation
+
+```elm
+unfold2 : (a -> Maybe(b,a))   -> a -> List b 
+unfold2      f              state  =
+            case f state of
+                    Just (x, newState) -> 
+                
+                         x:: unfold2  f  newState
+                    Nothing            -> []
+
+```
+
+## Map 
+
+```elm
+mapUnfold : (a -> b) -> List a -> List b 
+mapUnfold fct l = 
+    let 
+        g :   List a -> Maybe ( b ,  List a  )
+        g l0 = 
+            case (List.head l0,List.tail l0) of 
+                (Just a,Just b) -> Just(fct a,b)
+                _ -> Nothing 
+    in unfold2 g  l 
+
+{-
+Exemple 
+mapUnfold (\x -> x*x) [1,2,3]
+-}
+
+```
+
+## Filter
+
+Filter fonctionne sur le meme principe que Map mais ne retiens pas tous les elements.
+
+```elm
+filterUnfold : (a -> Bool) -> List a -> List a
+filterUnfold  predicat l = 
+    let 
+        g :   List a -> Maybe ( a ,  List a  )
+        g l0 = 
+            case (List.head l0,List.tail l0) of 
+                (Just a,Just b) -> 
+                    if (predicat a ) 
+                    then Just(a,b)
+                    else g (List.drop 1 l0)
+                _ -> Nothing 
+    in unfold2  g  l 
+```
+
+## FilterMap
+
+```elm
+filterMapUnfold : (a -> Maybe b ) -> List a -> List b
+filterMapUnfold  predicat l = 
+    let 
+        g :   List a -> Maybe ( b ,  List a  )
+        g l0 = 
+            case (List.head l0,List.tail l0) of 
+                (Just a,Just b) -> 
+                    case (predicat a ) of
+                        Just p -> Just(p,b)
+                        Nothing->g (List.drop 1 l0)
+                 
+                _ -> Nothing 
+    in unfold2  g  l 
+{-
+Exemple 
+filterMapUnfold(\x-> String.toInt x) ["0","e","1","f","2"]
+-}
+```
+
+
+## Decompostion d un entier en produit de ses facteurs 
+
+```elm 
+facteurs : (Int,List Int ) -> List Int 
+facteurs (x,l) = 
+    let 
+        g : (Int , List Int ) -> Maybe (Int , (Int , List Int ) ) 
+        g (x0 , l0) = 
+            case ((x0 ,List.head l0),List.tail l0) of 
+                ((x1, Just a),Just b) -> if (modBy  a x1 == 0  )
+                                        then Just (a,(x1 , b))
+                                        else g (x1,List.drop 1 l0)
+                    
+                _ -> Nothing 
+    in unfold2 g  (x,l) 
+
+
+facteurs2 xp = facteurs (xp , (List.range 1 xp))
+```
+
+## Decomposition d un entier dans une base
+
+```elm
+decompositionBase : Int -> Int  ->  List Int 
+decompositionBase entier base = 
+    let 
+        g : (Int , Int ) -> Maybe(Int , (Int , Int ))
+        g (entier0,base0)= 
+          if (entier0 < 1)
+          then Nothing
+          else Just(modBy base0 entier0, ( entier0//base0, base0 ))
+    in unfold2 g  (entier,base) 
+```
