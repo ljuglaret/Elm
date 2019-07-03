@@ -1,0 +1,214 @@
+<!--
+
+- title : Norme IEEE754
+- author : Laure Juglaret
+
+
+-->  
+
+### Préambule : 
+certaines des fonctions sont définies  <a href = https://github.com/ljuglaret/Fold/blob/gh-pages/README.md> ici </a>
+et les explications se trouvent <a href = https://ljuglaret.github.io/Elm/Fold.html> ici </a>.   
+
+## Ligne 1 
+
+Quatre Etapes sont nécessaires  : 
+
+-   récupérer la partie entière (avant la virgule)
+    -   Exemples : 
+            8.45 -> 8 
+            8.99 -> 8
+
+```elm
+partieEntiere : Float -> Int 
+partieEntiere p = 
+    case (String.split "." (String.fromFloat p)) of 
+        x::y::s -> Maybe.withDefault 0 (String.toInt x) 
+        x::s  -> Maybe.withDefault 0 (String.toInt x) 
+        _ -> 0 
+```
+
+- récupérer la partie décimale (après la virgule)
+    -    Exemple : 
+            -   8.45 -> 0.45
+            -   9.1  -> 0.1
+
+
+```elm
+partieDecimale : Float -> Float  
+partieDecimale p = 
+    case (String.split "." (String.fromFloat p)) of 
+        x::y::s -> Maybe.withDefault 0 (String.toFloat ("0."++y))
+        _ -> 0   
+
+```
+
+- Exprimer la partie entière en base binaire   
+        Pour cela on veut "déconstruire" un nombre on peut donc utiliser unfold left (comme un unfold classique mais la liste finale est construite de la droite vers la gauche)  
+```elm 
+decompositionBase : Int -> Int  ->  List Int 
+decompositionBase entier base = 
+    let 
+        g : (Int , Int ) -> Maybe(Int , (Int , Int ))
+        g (entier0,base0)= 
+        if (entier0 < 1)
+        then Nothing
+        else Just(modBy base0 entier0, ( entier0//base0, base0 ))
+    in unfold2G g  (entier,base) 
+partieEntiereBin :  Int  -> List Int 
+partieEntiereBin x = decompositionBase x  2
+```
+
+- Exprimer la partie décimale en base binaire   
+    -   Exemple : 
+        -   0.8 * 2     ->  1.6   
+        -   0.6 * 2     ->  1.2   
+        -   0.2 * 2     ->  0.4
+        -   0.4 * 2     ->  0.8   
+                résultat:  1100
+```elm
+finalApresVirgule  :  Float -> List Int 
+finalApresVirgule x = 
+    let
+        aux : List Int -> Float -> Int -> List Int 
+        aux l x0  compte = 
+            let 
+                a = (partieEntiere (2* x0))
+            in
+                if (compte /= 10)
+                then aux  (a ::l) (2*x0 - (toFloat a) )     (compte + 1 )
+                else List.reverse l
+    in aux [] (partieDecimale x) 0
+```
+
+Résultat : 
+
+```elm
+final : Float -> (List Int , List Int)
+final x = (partieEntiereBin (partieEntiere x) , finalApresVirgule x )
+```
+
+## Ligne 2  
+
+``` elm 
+exposant : Float -> Int 
+exposant x = 
+    let 
+        expoMax x0 puiss2 acc = 
+            if (x0 > puiss2 )
+            then expoMax x0       (2 * puiss2)  (acc + 1 ) 
+            else 126 + acc
+    in expoMax (partieEntiere x)  1 0
+
+exposantEnBinaire :  Float -> List Int 
+exposantEnBinaire x = decompositionBase (exposant x ) 2
+```
+
+## Ligne 3 
+On forme une liste de 32 éléments ainsi  :   
+ - si le nombre de départ est positif alors le premier élément est 0,   
+ sinon le premier élément est 1.   
+ - on ajoute l exposant en binaire   
+ - on ajoute la chaine de départ en binaire sans le premier élément
+ - on complète par des 0 .
+```elm
+complete : List Int -> List Int 
+complete str = 
+    if (List.length str == 32) 
+    then str 
+    else complete (str++[0])
+
+
+format x = 
+    let 
+        signe =
+            if x < 0
+            then [1]
+            else[0]
+    in
+        let 
+            semi = signe ++ (exposantEnBinaire x)++ (List.drop 1 ((partieEntiereBin (partieEntiere x)) ++ (finalApresVirgule x)))
+        in complete semi
+
+```
+
+## Ligne 4
+On reprend la ligne précédente mais pour plus de lisibilité on regroupe par blocs de 4. 
+
+```elm 
+parBlocs : List Int -> List (List Int )
+parBlocs l =
+    if List.isEmpty l
+    then []
+    else
+        (List.take 4 l) :: (parBlocs (List.drop 4 l))
+```
+
+## Ligne 5
+
+Ensuite, il faut écrire chaque blocs binaires dans leur représentations hexadecimale.
+
+Tout comme nous avons utilise un unfold left pour déconstruire un nombre exprime en base décimale,
+nous allons utiliser un fold left pour passer d une représentation binaire a une représentation décimale 
+
+```elm
+foldLeft (\x y -> x + 2  * y ) 0 b
+```
+
+En effet
+
+```elm
+foldLeft (\x y -> x + 2  * y )  0 [x0,x1,x2,x3,x4] -> x0 + (2 * (x1 + 2*(x2 + 2*(x3 + 2 *x4))))
+```
+
+Ce qui s utilisera de la manière suivante 
+
+```elm 
+binVersHexa : List Int -> String
+binVersHexa b =
+    let 
+        dec :  Int
+        dec = foldLeft (\x y -> x + 2  * y ) 0 b
+    in
+        if dec < 10
+        then String.fromFloat (toFloat dec)
+        else 
+            if dec == 10
+            then "A"
+            else if dec == 11
+            then "B"
+            else if dec == 12
+            then "C"
+            else if dec == 13
+            then "D"
+            else if dec == 14
+            then "E"
+            else  "F"
+
+```
+
+Enfin, il faut appliquer cette fonction a tous les blocs.
+
+```elm 
+blocsHexa : Float ->  String
+blocsHexa x = String.concat(List.map (\bloc -> binVersHexa bloc) (parBlocs(format x )))
+``` 
+
+NB : 
+```elm
+List.map (\bloc -> binVersHexa bloc)  (parBlocs(format x ))
+```
+est de type List String puisque   
+map  applique une fonction de type  : (List Int -> String )   
+a une List (List Int)   
+Or map est de type (a -> b ) -> List a -> List b   
+et ici a == List Int et b == String , donc son type de retour est List String.   
+On utilise donc String.concat pour concaténer toutes les String de la liste en une seule.   
+Illustration : 
+```elm 
+String .concat ["4","0","E"] -> "40E"
+```
+
+## Pour tester
+
+<a href ="https://ljuglaret.github.io/Elm/Norme.html" > ICI </a>
