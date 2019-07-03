@@ -18,21 +18,20 @@ foldRight f x l =
 ** fr pour FoldRight
 
 ### cas 1
- [1] ->         f 1 (fr f  x [] )    -> f 1 x 
+ [1] -> f 1 (fr f  x [] )   
+    -> f 1  x 
 
 ### cas 2
- [1,2] -> f 1 (fr f x [2])        
-        ->    (f 2 (fr f x []))    
+ [1,2] ->  f 1 (fr f x [2])              
+        -> f 1 (f 2 (fr f x []))   
+        -> f 1 (f 2 x ) 
 
 ### cas 3
- gauche : descente, droite montee
-[1,2,3,4]-> f 1 (fr f x [2,3,4])          -> f 1 (f 2 (f 3 (f 4 x) ))
-        ->      (f 2 (fr f x [3,4]))      -> f 2 (f 3 (f 4 x ))
-        ->           (f 3 (fr x [4]))     -> f 3 (f 4 x)
-                          (f 4 (fr x [])) -> f 4 x
-
-
-
+    [1,2,3]-> f 1 (fr f x [2,3])     
+              -> f 1 (f 2 (fr f x [3]))     
+              -> f 1 ( f 2 ( f 3 (fr x []))
+              -> f 1 ( f 2 ( f 3  x))  
+    
 # Fold Left
 
 ```elm
@@ -50,20 +49,22 @@ foldLeft f x l =
 
 ### cas 1
 
- [1] -> fl f   (f 1    x        ) [] -> f 1 x
+ [1] -> fl f   (f 1    x )[]    
+     -> f 1 x
 
 ### cas 2
 
- [1,2] -> fl f (f 1 x) [2] 
-         -> fl f (f 2 (f 1 x)) []
+ [1,2] -> fl f (f 1 x) [2]    
+         -> fl f (f 2 (f 1 x)) []   
+         -> f 2 (f 1 x)
 
 
 ### cas 3         
 
-[1,2,3,4]->fl f (f 1 x) [2,3,4]
-         ->fl f (f 2 (f 1 x)) [3,4]
-         ->fl f (f 3 (f 2 (f 1 x))) [4]
-         ->fl f (f 4 (f 3 (f 2 (f 1 x)))) 
+[1,2,3]->fl f (f 1 x) [2,3]   
+         ->fl f (f 2 (f 1 x)) [3]   
+         ->fl f (f 3 (f 2 (f 1 x))) []
+         -> f 3 (f 2 (f 1 x)) 
 
 # Exemples
 
